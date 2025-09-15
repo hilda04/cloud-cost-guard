@@ -10,10 +10,10 @@ Metadata:
     SpdxLicenseId: MIT
     LicenseUrl: LICENSE
     ReadmeUrl: README.md
-    HomePageUrl: https://github.com/<your-gh-username>/cloud-cost-guard
+    HomePageUrl: https://github.com/hilda04/cloud-cost-guard
     Labels: [cost, tagging, governance, serverless, dashboard, alerts]
     SemanticVersion: 1.0.0
-    SourceCodeUrl: https://github.com/<your-gh-username>/cloud-cost-guard
+    SourceCodeUrl: https://github.com/hilda04/cloud-cost-guard
 
   AWS::CloudFormation::Interface:
     ParameterGroups:
