@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cloud Cost Guard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px;}
+    .card{border:1px solid #e5e7eb;border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,0.04);margin-bottom:20px}
+    h1{font-size:22px;margin-bottom:8px}
+    .muted{color:#6b7280}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>Cloud Cost Guard <span class="muted">(non‑prod)</span></h1>
+  <div class="card"><div id="summary">Loading…</div></div>
+  <div class="grid">
+    <div class="card"><canvas id="costTrend"></canvas></div>
+    <div class="card"><pre id="tagAudit" style="white-space:pre-wrap"></pre></div>
+  </div>
+<script>
+const REPORT_URL = 'https://YOUR_BUCKET.s3.amazonaws.com/reports/summary.json';
+const TAG_URL = 'https://YOUR_BUCKET.s3.amazonaws.com/reports/tag_audit.json';
+
+async function loadJSON(url){
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('Failed '+url);
+  return r.json();
+}
+
+(async () => {
+  try{
+    const [summary, tag] = await Promise.all([loadJSON(REPORT_URL), loadJSON(TAG_URL)]);
+    const spike = summary.spike;
+    const s = document.getElementById('summary');
+    s.innerHTML = spike ? `As of <b>${summary.as_of}</b>, yesterday cost was <b>$${spike.yesterday.toFixed(2)}</b> vs 7‑day avg <b>$${spike.trailing7.toFixed(2)}</b> → <b>${spike.pct.toFixed(1)}%</b> change.` : 'Insufficient data yet.';
+
+    const ctx = document.getElementById('costTrend');
+    const labels = summary.timeseries.map(d=>d.date);
+    const totals = summary.timeseries.map(d=>d.total);
+    new Chart(ctx,{
+      type:'line',
+      data:{labels,datasets:[{label:'Daily non‑prod cost (USD)',data:totals, tension:0.2}]},
+      options:{responsive:true, plugins:{legend:{display:true}}}
+    });
+
+    const nonc = tag.noncompliant || 0;
+    const sample = (tag.findings||[]).slice(0,10).map(f=>`• ${f.arn}\n   missing: ${f.missing.join(', ')||'—'}; invalid env: ${f.invalid_environment||'—'}`).join('\n');
+    document.getElementById('tagAudit').textContent = `Tagging non‑compliance: ${nonc}/${tag.total_resources}\n\nExamples:\n${sample || 'No issues found 🎉'}`;
+  }catch(e){
+    document.getElementById('summary').textContent='Error loading reports: '+e.message;
+  }
+})();
+</script>
+</body>
+</html>
