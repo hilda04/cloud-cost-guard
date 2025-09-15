@@ -158,32 +158,35 @@ Resources:
             Schedule: cron(5 5 * * ? *)
             Name: cost-spike-daily
 
-  TagAuditChecker:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/tag_audit_checker/
-      Handler: app.handler
-      Environment:
-        Variables:
-          REPORTS_BUCKET: !Ref ReportsBucket
-          ALERTS_TOPIC_ARN: !Ref AlertsTopic
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action: ['tagging:GetResources']
-              Resource: '*'
-            - Effect: Allow
-              Action: ['s3:PutObject','s3:PutObjectAcl']
-              Resource: !Sub '${ReportsBucket.Arn}/*'
-            - Effect: Allow
-              Action: ['sns:Publish']
-              Resource: !Ref AlertsTopic
-      Events:
-        DailySchedule:
-          Type: Schedule
-          Properties:
-            Schedule: cron(15 5 * * ? *)
-            Name: tag-audit-daily
+ TagAuditChecker:
+  Type: AWS::Serverless::Function
+  Properties:
+    CodeUri: src/tag_audit_checker/
+    Handler: app.handler
+    Environment:
+      Variables:
+        REPORTS_BUCKET: !Ref ReportsBucket
+        ALERTS_TOPIC_ARN: !Ref AlertsTopic
+    Policies:
+      - Statement:
+          - Effect: Allow
+            Action:
+              - tag:GetResources
+              - tag:GetTagKeys
+              - tag:GetTagValues
+            Resource: "*"
+          - Effect: Allow
+            Action: ['s3:PutObject','s3:PutObjectAcl']
+            Resource: !Sub '${ReportsBucket.Arn}/*'
+          - Effect: Allow
+            Action: ['sns:Publish']
+            Resource: !Ref AlertsTopic
+    Events:
+      DailySchedule:
+        Type: Schedule
+        Properties:
+          Schedule: cron(15 5 * * ? *)
+          Name: tag-audit-daily
 
 Outputs:
   ReportsBucketName:
