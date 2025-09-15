@@ -88,7 +88,7 @@ def compute_spike(timeseries):
 
 def push_report(report):
     key = 'reports/summary.json'
-    s3.put_object(Bucket=BUCKET, Key=key, Body=json.dumps(report, cls=Enc).encode('utf-8'), ContentType='application/json', ACL='public-read')
+    s3.put_object(Bucket=BUCKET, Key=key, Body=json.dumps(report, cls=Enc).encode('utf-8'), ContentType='application/json')
     # also write a dated snapshot
     date_key = f"timeseries/{report['as_of']}.json"
     s3.put_object(Bucket=BUCKET, Key=date_key, Body=json.dumps(report, cls=Enc).encode('utf-8'), ContentType='application/json')
