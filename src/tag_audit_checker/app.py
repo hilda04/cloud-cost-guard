@@ -7,7 +7,7 @@ sns = boto3.client('sns')
 BUCKET = os.getenv('REPORTS_BUCKET')
 ENV_KEY = os.getenv('ENV_TAG_KEY', 'Environment')
 REQUIRED = [t.strip() for t in os.getenv('REQUIRED_TAGS','Environment,Owner,CostCenter').split(',') if t.strip()]
-ALLOWED_ENV = {t.strip() for t in os.getenv('ALLOWED_ENV_VALUES','nonprod,dev,qa,stage').split(',') if t.strip()]
+ALLOWED_ENV = [{t.strip() for t in os.getenv('ALLOWED_ENV_VALUES','nonprod,dev,qa,stage').split(',') if t.strip()]
 TOPIC = os.getenv('ALERTS_TOPIC_ARN', None)
 
 
