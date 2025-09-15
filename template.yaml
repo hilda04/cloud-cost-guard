@@ -158,7 +158,7 @@ Resources:
             Schedule: cron(5 5 * * ? *)
             Name: cost-spike-daily
 
- TagAuditChecker:
+TagAuditChecker:
   Type: AWS::Serverless::Function
   Properties:
     CodeUri: src/tag_audit_checker/
@@ -168,18 +168,14 @@ Resources:
         REPORTS_BUCKET: !Ref ReportsBucket
         ALERTS_TOPIC_ARN: !Ref AlertsTopic
     Policies:
+      - arn:aws:iam::aws:policy/ResourceGroupsandTagEditorReadOnlyAccess   # <-- add
       - Statement:
           - Effect: Allow
             Action:
-              - tag:GetResources
-              - tag:GetTagKeys
-              - tag:GetTagValues
-            Resource: "*"
-          - Effect: Allow
-            Action: ['s3:PutObject','s3:PutObjectAcl']
+              - s3:PutObject
             Resource: !Sub '${ReportsBucket.Arn}/*'
           - Effect: Allow
-            Action: ['sns:Publish']
+            Action: sns:Publish
             Resource: !Ref AlertsTopic
     Events:
       DailySchedule:
