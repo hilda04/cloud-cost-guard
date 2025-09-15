@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+AllowedMethods: [GET]
+AllowedOrigins: ['*']
+MaxAge: 300
+
+
+AlertsTopic:
+Type: AWS::SNS::Topic
+Properties:
+TopicName: cloud-cost-guard-alerts
+
+
+CostSpikeChecker:
+Type: AWS::Serverless::Function
+Properties:
+CodeUri: src/cost_spike_checker/
+Handler: app.handler
+Policies:
+- Statement:
+- Effect: Allow
+Action:
+- ce:GetCostAndUsage
+Resource: '*'
+- Effect: Allow
+Action:
+- s3:PutObject
+- s3:PutObjectAcl
+Resource: !Sub arn:aws:s3:::${ReportsBucketName}/*
+- Effect: Allow
+Action: sns:Publish
+Resource: !Ref AlertsTopic
+Events:
+DailySchedule:
+Type: Schedule
+Properties:
+Schedule: cron(5 5 * * ? *) # 05:05 UTC daily
+Name: cost-spike-daily
+
+
+TagAuditChecker:
+Type: AWS::Serverless::Function
+Properties:
+CodeUri: src/tag_audit_checker/
+Handler: app.handler
+Policies:
+- Statement:
+- Effect: Allow
+Action:
+- tagging:GetResources
+Resource: '*'
+- Effect: Allow
+Action:
+- s3:PutObject
+- s3:PutObjectAcl
+Resource: !Sub arn:aws:s3:::${ReportsBucketName}/*
+- Effect: Allow
+Action: sns:Publish
+Resource: !Ref AlertsTopic
+Events:
+DailySchedule:
+Type: Schedule
+Properties:
+Schedule: cron(15 5 * * ? *) # 05:15 UTC daily
+Name: tag-audit-daily
+
+
+Outputs:
+ReportsBucketOutput:
+Description: Bucket with dashboard JSON outputs
+Value: !Ref ReportsBucket
+AlertsTopicArn:
+Description: SNS topic for email subscriptions
+Value: !Ref AlertsTopic
