@@ -32,7 +32,7 @@ Metadata:
       AllowedEnvironmentValues: { default: All allowed env values (comma-separated) }
       RequiredTags: { default: Required tag keys (comma-separated) }
       AlertEmail: { default: Email to receive alerts }
-      SpikePctThreshold: { default: % over trailing 7-day avg to alert }
+      SpikePctThreshold: { default: "% over trailing 7-day avg to alert" }
       SpikeMinDollars: { default: Minimum $ increase to alert }
       MakeReportsPublic: { default: Expose reports JSON for dashboard (S3 public read) }
 
