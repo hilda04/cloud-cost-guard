@@ -51,7 +51,7 @@ def handler(event, context):
         'noncompliant': len(findings),
         'findings': findings[:200]  # cap for report size; full list can be paged if needed
     }
-    s3.put_object(Bucket=BUCKET, Key='reports/tag_audit.json', Body=json.dumps(summary).encode('utf-8'), ContentType='application/json', ACL='public-read')
+    s3.put_object(Bucket=BUCKET, Key='reports/tag_audit.json', Body=json.dumps(summary).encode('utf-8'), ContentType='application/json')
 
     if TOPIC and findings:
         msg = (f"Tag audit found {len(findings)} non‑compliant resources out of {len(resources)}. "
