@@ -27,14 +27,14 @@ Metadata:
           default: Dashboard
         Parameters: [MakeReportsPublic]
     ParameterLabels:
-      EnvironmentTagKey: { default: Tag key for environment }
-      EnvironmentTagValue: { default: Tag value indicating non-prod }
-      AllowedEnvironmentValues: { default: All allowed env values (comma-separated) }
-      RequiredTags: { default: Required tag keys (comma-separated) }
-      AlertEmail: { default: Email to receive alerts }
+      EnvironmentTagKey: { default: "Tag key for environment" }
+      EnvironmentTagValue: { default: "Tag value indicating non-prod" }
+      AllowedEnvironmentValues: { default: "All allowed env values (comma-separated)" }
+      RequiredTags: { default: "Required tag keys (comma-separated)" }
+      AlertEmail: { default: "Email to receive alerts" }
       SpikePctThreshold: { default: "% over trailing 7-day avg to alert" }
-      SpikeMinDollars: { default: Minimum $ increase to alert }
-      MakeReportsPublic: { default: Expose reports JSON for dashboard (S3 public read) }
+      SpikeMinDollars: { default: "Minimum $ increase to alert" }
+      MakeReportsPublic: { default: "Expose reports JSON for dashboard (S3 public read)" }
 
 Parameters:
   EnvironmentTagKey:
