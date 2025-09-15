@@ -23,8 +23,8 @@
     <div class="card"><pre id="tagAudit" style="white-space:pre-wrap"></pre></div>
   </div>
 <script>
-const REPORT_URL = 'https://YOUR_BUCKET.s3.amazonaws.com/reports/summary.json';
-const TAG_URL = 'https://YOUR_BUCKET.s3.amazonaws.com/reports/tag_audit.json';
+const REPORT_URL = 'https://ccg-test-reportsbucket-uwwxpueelvst.s3.us-east-1.amazonaws.com/reports/summary.json';
+const TAG_URL = 'https://ccg-test-reportsbucket-uwwxpueelvst.s3.us-east-1.amazonaws.com/reports/tag_audit.json';
 
 async function loadJSON(url){
   const r = await fetch(url, {cache:'no-store'});
