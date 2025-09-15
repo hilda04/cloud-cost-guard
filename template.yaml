@@ -1,73 +1,202 @@
 AWSTemplateFormatVersion: '2010-09-09'
-AllowedMethods: [GET]
-AllowedOrigins: ['*']
-MaxAge: 300
+Transform: AWS::Serverless-2016-10-31
+Description: Cloud Cost Guard – non-prod cost spikes and tag audit (SAR)
 
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: cloud-cost-guard
+    Description: Dashboard + alerts for non-prod AWS cost spikes and mis-tagged resources.
+    Author: Hilda Machando
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    HomePageUrl: https://github.com/<your-gh-username>/cloud-cost-guard
+    Labels: [cost, tagging, governance, serverless, dashboard, alerts]
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/<your-gh-username>/cloud-cost-guard
 
-AlertsTopic:
-Type: AWS::SNS::Topic
-Properties:
-TopicName: cloud-cost-guard-alerts
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Tagging
+        Parameters: [EnvironmentTagKey, EnvironmentTagValue, AllowedEnvironmentValues, RequiredTags]
+      - Label:
+          default: Alerting
+        Parameters: [AlertEmail, SpikePctThreshold, SpikeMinDollars]
+      - Label:
+          default: Dashboard
+        Parameters: [MakeReportsPublic]
+    ParameterLabels:
+      EnvironmentTagKey: { default: Tag key for environment }
+      EnvironmentTagValue: { default: Tag value indicating non-prod }
+      AllowedEnvironmentValues: { default: All allowed env values (comma-separated) }
+      RequiredTags: { default: Required tag keys (comma-separated) }
+      AlertEmail: { default: Email to receive alerts }
+      SpikePctThreshold: { default: % over trailing 7-day avg to alert }
+      SpikeMinDollars: { default: Minimum $ increase to alert }
+      MakeReportsPublic: { default: Expose reports JSON for dashboard (S3 public read) }
 
+Parameters:
+  EnvironmentTagKey:
+    Type: String
+    Default: Environment
+    AllowedPattern: '^[A-Za-z0-9_.:/=+\-@]+$'
+  EnvironmentTagValue:
+    Type: String
+    Default: nonprod
+  RequiredTags:
+    Type: String
+    Default: Environment,Owner,CostCenter
+  AllowedEnvironmentValues:
+    Type: String
+    Default: nonprod,dev,qa,stage
+  SpikePctThreshold:
+    Type: Number
+    Default: 30
+    MinValue: 5
+    MaxValue: 500
+  SpikeMinDollars:
+    Type: Number
+    Default: 20
+    MinValue: 0
+    MaxValue: 100000
+  AlertEmail:
+    Type: String
+    AllowedPattern: '^[^@\n]+@[^@\n]+\.[^@\n]+$'
+    Description: Email address to subscribe to alerts (confirmation required)
+  MakeReportsPublic:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true','false']
 
-CostSpikeChecker:
-Type: AWS::Serverless::Function
-Properties:
-CodeUri: src/cost_spike_checker/
-Handler: app.handler
-Policies:
-- Statement:
-- Effect: Allow
-Action:
-- ce:GetCostAndUsage
-Resource: '*'
-- Effect: Allow
-Action:
-- s3:PutObject
-- s3:PutObjectAcl
-Resource: !Sub arn:aws:s3:::${ReportsBucketName}/*
-- Effect: Allow
-Action: sns:Publish
-Resource: !Ref AlertsTopic
-Events:
-DailySchedule:
-Type: Schedule
-Properties:
-Schedule: cron(5 5 * * ? *) # 05:05 UTC daily
-Name: cost-spike-daily
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        ENV_TAG_KEY: !Ref EnvironmentTagKey
+        ENV_TAG_VALUE: !Ref EnvironmentTagValue
+        REQUIRED_TAGS: !Ref RequiredTags
+        ALLOWED_ENV_VALUES: !Ref AllowedEnvironmentValues
+        SPIKE_PCT_THRESHOLD: !Ref SpikePctThreshold
+        SPIKE_MIN_DOLLARS: !Ref SpikeMinDollars
 
+Conditions:
+  PublicReports: !Equals [!Ref MakeReportsPublic, 'true']
 
-TagAuditChecker:
-Type: AWS::Serverless::Function
-Properties:
-CodeUri: src/tag_audit_checker/
-Handler: app.handler
-Policies:
-- Statement:
-- Effect: Allow
-Action:
-- tagging:GetResources
-Resource: '*'
-- Effect: Allow
-Action:
-- s3:PutObject
-- s3:PutObjectAcl
-Resource: !Sub arn:aws:s3:::${ReportsBucketName}/*
-- Effect: Allow
-Action: sns:Publish
-Resource: !Ref AlertsTopic
-Events:
-DailySchedule:
-Type: Schedule
-Properties:
-Schedule: cron(15 5 * * ? *) # 05:15 UTC daily
-Name: tag-audit-daily
+Resources:
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: !If [PublicReports, false, true]
+        BlockPublicPolicy: !If [PublicReports, false, true]
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: !If [PublicReports, false, true]
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET]
+            AllowedOrigins: ['*']
+            MaxAge: 300
 
+  ReportsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: PublicReports
+    Properties:
+      Bucket: !Ref ReportsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowPublicRead
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${ReportsBucket.Arn}/*'
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'cloud-cost-guard-alerts-${AWS::AccountId}-${AWS::Region}'
+
+  AlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+      TopicArn: !Ref AlertsTopic
+
+  CostSpikeChecker:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cost_spike_checker/
+      Handler: app.handler
+      Environment:
+        Variables:
+          REPORTS_BUCKET: !Ref ReportsBucket
+          ALERTS_TOPIC_ARN: !Ref AlertsTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ['ce:GetCostAndUsage']
+              Resource: '*'
+            - Effect: Allow
+              Action: ['s3:PutObject','s3:PutObjectAcl']
+              Resource: !Sub '${ReportsBucket.Arn}/*'
+            - Effect: Allow
+              Action: ['sns:Publish']
+              Resource: !Ref AlertsTopic
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(5 5 * * ? *)
+            Name: cost-spike-daily
+
+  TagAuditChecker:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/tag_audit_checker/
+      Handler: app.handler
+      Environment:
+        Variables:
+          REPORTS_BUCKET: !Ref ReportsBucket
+          ALERTS_TOPIC_ARN: !Ref AlertsTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ['tagging:GetResources']
+              Resource: '*'
+            - Effect: Allow
+              Action: ['s3:PutObject','s3:PutObjectAcl']
+              Resource: !Sub '${ReportsBucket.Arn}/*'
+            - Effect: Allow
+              Action: ['sns:Publish']
+              Resource: !Ref AlertsTopic
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(15 5 * * ? *)
+            Name: tag-audit-daily
 
 Outputs:
-ReportsBucketOutput:
-Description: Bucket with dashboard JSON outputs
-Value: !Ref ReportsBucket
-AlertsTopicArn:
-Description: SNS topic for email subscriptions
-Value: !Ref AlertsTopic
+  ReportsBucketName:
+    Description: Bucket with dashboard JSON outputs
+    Value: !Ref ReportsBucket
+  ReportsSummaryUrl:
+    Condition: PublicReports
+    Description: Public URL to summary JSON
+    Value: !Sub 'https://${ReportsBucket}.s3.${AWS::Region}.amazonaws.com/reports/summary.json'
+  ReportsTagAuditUrl:
+    Condition: PublicReports
+    Description: Public URL to tag audit JSON
+    Value: !Sub 'https://${ReportsBucket}.s3.${AWS::Region}.amazonaws.com/reports/tag_audit.json'
+  AlertsTopicArn:
+    Description: SNS topic for alerts
+    Value: !Ref AlertsTopic
